@@ -528,7 +528,8 @@ if(xmlFile != null){
 
 function saveSettings()
 {
-  var desc = new ActionDescriptor().putString(kMyString, defaultPath);
+  var desc = new ActionDescriptor();
+	desc.putString(kMyString, defaultPath);
   // "true" means setting persists across Photoshop launches.
   app.putCustomOptions( kMySettings, desc, true );
 }
