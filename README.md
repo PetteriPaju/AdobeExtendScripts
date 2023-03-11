@@ -1,4 +1,4 @@
-# AdobeExtendScripts
+# Adobe Extendscripts
 This page contains collection of extensions made for Adobe Illustrator and Phoshop.
 Extensions are made using Javascript and Adobe's Extendscript-API.
 
