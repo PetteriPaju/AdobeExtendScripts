@@ -27,7 +27,7 @@ function main(){
     collapseAllGroups();
 
 
-//If a big amount og layers have been opened, have Illustrator notify user when all  smartobjects are open
+/*
 if(selectedSublayer.length>10){
 var bt = new BridgeTalk();
 bt.target = "illustrator";
@@ -35,7 +35,7 @@ bt.body = 'app.beep(); alert("Files Opened")';
 bt.onResult = function (inBT) { result = eval(inBT.body); };
 bt.onError = function (inBT) { alert(inBT.body); };
 bt.send(8);
-}
+}*/
 
 }
 

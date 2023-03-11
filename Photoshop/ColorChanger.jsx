@@ -1,32 +1,34 @@
 ﻿// This script will open a window, that allows user to setup color chnaging actions
 //All layers, wtih given name will be changed to corresponding color. Color change affects both shape-layers and pixel layers.
 
-
 //@include "TracingUtilities.jsx"
 //@include "SmartFill.jsx"
 Array.prototype.indexOf||(Array.prototype.indexOf=function(r,e,t){"use strict";return function(i,n){if(null==this)throw TypeError("Array.prototype.indexOf called on null or undefined");var f=r(this),o=f.length>>>0,u=t(0|n,o);if(u<0)u=e(0,o+u);else if(u>=o)return-1;if(void 0===i){for(;u!==o;++u)if(void 0===f[u]&&u in f)return u}else if(i!=i){for(;u!==o;++u)if(f[u]!=f[u])return u}else for(;u!==o;++u)if(f[u]===i)return u;return-1}}(Object,Math.max,Math.min));
 function customDraw() {with(this) {graphics.drawOSControl(); graphics.rectPath(0, 0, size[0], size[1]);graphics.fillPath(fillBrush);}}
 
-var defaultPath="~/Documents/AdobePresets/";
+var defaultPath="C:/AdobePresets/";
 var defaultName = "New Color Preset";
+
+var lastUsed = null;
+
 const kMySettings = "ColorChangerSettings";
-const kMyString = app.stringIDToTypeID( "myString" );
+const kMyString = app.stringIDToTypeID( "defaultPath" );
+const xmlString = app.stringIDToTypeID( "lastUsed" );
 
 var recolorExpr = /recolor/;
 
-
-
-
-
+var blendModeList = [["Unset","Unset"],["Normal",BlendMode.NORMAL],["Dissolve",BlendMode.DISSOLVE],["Darken",BlendMode.DARKEN],["Multiply",BlendMode.MULTIPLY],["Color Burn",BlendMode.COLORBURN],["Linear Burn",BlendMode.LINEARBURN],["Darker Color",BlendMode.DARKERCOLOR],["Lighten",BlendMode.LIGHTEN],["Screen",BlendMode.SCREEN],["Color Dodge",BlendMode.COLORDODGE],["Linear Dodge",BlendMode.LINEARDODGE],["Lighter Color",BlendMode.LIGHTERCOLOR],["Overlay",BlendMode.OVERLAY],["Soft Light",BlendMode.LINEARDODGE],["Hard Light",BlendMode.HARDLIGHT],["Vivid Light",BlendMode.VIVIDLIGHT],["Linear Light",BlendMode.LINEARLIGHT],["Pin Light",BlendMode.PINLIGHT],["Hard Mix",BlendMode.HARDMIX],["Difference",BlendMode.DIFFERENCE],["Exclusion",BlendMode.EXCLUSION],["Subtract",BlendMode.SUBTRACT],["Divide",BlendMode.DIVIDE],["Hue",BlendMode.HUE],["Saturation",BlendMode.SATURATION],["Color",BlendMode.COLORBLEND],["Luminosity",BlendMode.LUMINOSITY]]
 
 var presetNames = ["skin_base", "skin_dark1", "skin_dark2", "skin_light", "skin_outline"];
 
-function colorAction(name, color, applyGlow, isStroke) {
+function colorAction(name, color, applyGlow, isStroke, blending, opacity) {
 
     this.name = name;
     this.color = color;
+    this.blending = blending; 
     this.applyGlow= applyGlow;
 	this.isStroke= isStroke;
+    this.opacity = opacity;
 }
 
 
@@ -34,10 +36,10 @@ var DefColour = app.foregroundColor
 
 
 
-var w;
+var w = null;
 var actionQueue = [];
 
-var documentList = [];
+var TargetDocumentList = [];
 var actionGroup;
 
 init();
@@ -46,8 +48,21 @@ var selectedLayers;
 function init() {
     
     getSettings();
+
     selectedLayers = getSelectedLayersAll(app.activeDocument);
-    for (var i = 0; i < presetNames.length; i++) actionQueue.push(new colorAction(presetNames[i], DefColour,true,false));
+    if(lastUsed == null)
+    for (var i = 0; i < presetNames.length; i++) actionQueue.push(new colorAction(presetNames[i], DefColour,true,false,"Unset", 100));
+    else {
+
+        try{            
+            SetActionsFromXMLString(lastUsed);
+            
+        }
+        catch(e){
+            for (var i = 0; i < presetNames.length; i++) actionQueue.push(new colorAction(presetNames[i], DefColour,true,false,"Unset", 100));
+        }
+
+    }
     CreateWindow();
 
 }
@@ -99,7 +114,9 @@ xmlGroup.add("button",undefined,"Save XML").onClick = CreateXML;
 
     w.add("button", undefined, "Execute On Selection").onClick = function() {
 		 SetupRecolor();
+
         app.activeDocument.suspendHistory("Color Change", "RunOnSelection()");
+
          w.close();
          alert("Complete!");
     }
@@ -107,6 +124,11 @@ xmlGroup.add("button",undefined,"Save XML").onClick = CreateXML;
    w.add("button", undefined, "Execute to Document").onClick = function() {
         SetupRecolor();
         app.activeDocument.suspendHistory("Color Change", "RunOnThisDocument()");
+
+        var desc = new ActionDescriptor();
+        desc.putString(xmlString, CreateXMLString());
+        app.putCustomOptions( kMySettings, desc, true );
+
          w.close();
         alert("Complete!");
     }
@@ -116,7 +138,7 @@ xmlGroup.add("button",undefined,"Save XML").onClick = CreateXML;
 
 
 function SetupRecolor(){
-    actionQueue.push(new colorAction("recolor", DefColour,true, false));
+    actionQueue.push(new colorAction("recolor", DefColour,true, false,"Unset",100));
     
     }
 
@@ -214,14 +236,32 @@ function createColorPalette(root, cAction) {
 
         }
     
-
-
+  
         cAction.color = Colour;
         box.fillBrush = box.graphics.newBrush(box.graphics.BrushType.SOLID_COLOR, [cAction.color.rgb.red / 255, cAction.color.rgb.green / 255, cAction.color.rgb.blue / 255, 1]);
 
         CreateWindow();
 
     }
+
+
+        var blendingModeList = g.add('dropdownlist');
+        buildBlendingList(blendingModeList,cAction.blending);
+        blendingModeList.onChange = function() {
+            cAction.blending = blendingModeList.selection.id;
+        }
+
+        var opacityBox = g.add("edittext", undefined, cAction.opacity.toString());
+        opacityBox.onChange = function() {
+            cAction.opacity = parseFloat(opacityBox.text);
+            cAction.opacity = Math.max(0,cAction.opacity);
+            cAction.opacity = Math.min(100,cAction.opacity);
+            opacityBox.text = cAction.opacity;
+        };
+        opacityBox.text = cAction.opacity;
+
+
+
         var toggle =  g.add('checkbox', undefined, "Apply Glow");
         toggle.onClick = function() {
         cAction.applyGlow = toggle.value;
@@ -232,16 +272,33 @@ function createColorPalette(root, cAction) {
 	     var toggle2 =  g.add('checkbox', undefined, "isStroke?");
         toggle2.onClick = function() {
         cAction.isStroke = toggle.value;
+
+
           }
       
       toggle2.value = cAction.isStroke;
 
 }
 
+function buildBlendingList(listObject, selectThisID){
+
+var tmp;
+listObject.selection = 0;
+for(var i =0; i<blendModeList.length;i++){
+   tmp = listObject.add('item',blendModeList[i][0]);
+   tmp.id = blendModeList[i][1]
+
+   if(selectThisID == tmp.id)
+    listObject.selection = i;
+   
+}
 
 
-function RunOnThisDocument(){
-    
+}
+
+
+
+function RunOnThisDocument(){    
 	RunOnDocument(app.activeDocument);
 }
 
@@ -345,21 +402,120 @@ if( desc.hasKey( stringIDToTypeID( 'targetLayers' ) ) ){
       try{ 
          activeDocument.backgroundLayer; 
          makeActiveByIndex(desc.getReference(z ).getIndex() ); 
-             FillStyle(app.activeDocument.activeLayer, newColor);
+             FillStyle(app.activeDocument.activeLayer, newColor,actionQueueEntry.applyGlow,actionQueueEntry.opacity);
+
          if(actionQueueEntry.isStroke) FillSolidStroke(app.activeDocument.activeLayer, newColor);
          else  FillLayer(app.activeDocument.activeLayer, newColor);
+
       }catch(e){ 
          makeActiveByIndex(desc.getReference(z ).getIndex()+1); 
-            FillStyle(app.activeDocument.activeLayer, newColor);
+            FillStyle(app.activeDocument.activeLayer, newColor,actionQueueEntry.applyGlow,actionQueueEntry.opacity);
          if(actionQueueEntry.isStroke) FillSolidStroke(app.activeDocument.activeLayer, anewColor);
          else  FillLayer(app.activeDocument.activeLayer, newColor);
       } 
+
+      ApplyBlendingAndOpacityOnActiveLayer(actionQueueEntry.blending, actionQueueEntry.opacity);
     } 
 }          
      }
- else FillOutline(newColor);         
+ else FillOutline(newColor,actionQueueEntry.blending, actionQueueEntry.opacity,actionQueueEntry.applyGlow );   
 
 }
+
+
+function FillOutline(color, blendingID,opacityValue, applyToGlow){
+  
+    var ref = new ActionReference(); 
+    ref.putEnumerated( charIDToTypeID("Dcmn"), charIDToTypeID("Ordn"), charIDToTypeID("Trgt") ); 
+    var desc = executeActionGet(ref); 
+    if( desc.hasKey( stringIDToTypeID( 'targetLayers' ) ) ){ 
+       desc = desc.getList( stringIDToTypeID( 'targetLayers' )); 
+        var c = desc.count 
+         for(var i=0;i<c;i++){ 
+          try{ 
+             activeDocument.backgroundLayer; 
+             makeActiveByIndex(desc.getReference( i ).getIndex() ); 
+                 FillStyle(app.activeDocument.activeLayer, color,applyToGlow);
+          }catch(e){ 
+             makeActiveByIndex(desc.getReference( i ).getIndex()+1); 
+             FillStyle(app.activeDocument.activeLayer, color,applyToGlow);
+          } 
+
+          ApplyBlendingAndOpacityOnActiveLayer(blendingID,opacityValue);
+        } 
+    }
+
+
+  }
+
+function ApplyBlendingAndOpacityOnActiveLayer(blendingID,opacityValue){
+
+    var layer = app.activeDocument.activeLayer;
+    if(layer == null)return;
+    if(layer.locked)return;
+
+    var parentVisible =  true;
+
+  //To keep layer visibility same as before, we must also check visiibility of parent group of selected smart object.
+if(layer.parent != app.activeDocument){             
+   //store whetever parent group was visible before turning it visible. This will ensure that script gets a right visibility value for SmartObject later in code.
+    parentVisible =  layer.parent.visible;
+    ShowLayer( layer.parent);
+    }
+ 
+ //Store Visibility value of smart object.
+    var wasVisible = layer.visible;
+    ShowLayer(layer);
+    app.activeDocument.activeLayer = layer;
+        ApplyOpacityToActiveLayer(opacityValue);
+        ApplyBlendingOnActiveLayer(blendingID);
+    //ApplyOpacityToActiveLayer(opacity);
+
+//    if(applyToGlow)
+//   FillStyle(app.activeDocument.activeLayer, color);
+
+                    //Restore the original visibility for the smartObject.
+layer.visible = wasVisible;
+
+if(!wasVisible)HideLayer(layer);
+
+
+//Restore the original visibility for the parent group (if it exists)
+  if(layer.parent != app.activeDocument && !parentVisible)    
+  HideLayer(layer.parent);   
+   
+}
+
+function ApplyBlendingOnActiveLayer(blendingID){
+    if(blendingID == "Unset" || blendingID == undefined)return;
+    app.activeDocument.activeLayer.blendMode = blendingID;
+}
+
+function ApplyOpacityToActiveLayer(opacityValue){
+    
+// =======================================================
+var idsetd = charIDToTypeID( "setd" );
+    var desc233 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref54 = new ActionReference();
+        var idLyr = charIDToTypeID( "Lyr " );
+        var idOrdn = charIDToTypeID( "Ordn" );
+        var idTrgt = charIDToTypeID( "Trgt" );
+        ref54.putEnumerated( idLyr, idOrdn, idTrgt );
+    desc233.putReference( idnull, ref54 );
+    var idT = charIDToTypeID( "T   " );
+        var desc234 = new ActionDescriptor();
+        var idOpct = charIDToTypeID( "Opct" );
+        var idPrc = charIDToTypeID( "#Prc" );
+        desc234.putUnitDouble( idOpct, idPrc, opacityValue);
+    var idLyr = charIDToTypeID( "Lyr " );
+    desc233.putObject( idT, idLyr, desc234 );
+executeAction( idsetd, desc233, DialogModes.NO );
+
+}
+
+
+
 
 function getLayerSetsData(actionQueue,layerCollection)
 {
@@ -478,9 +634,32 @@ function CreateActionFromXML(xmlObject){
          if(xmlObject.isStroke[0] != null)
            ca.isStroke = (xmlObject.isStroke[0].toString() === 'true'); 
            else ca.isStroke =false;   
+
+           ca.blending = "Unset";
+           if(xmlObject.blending[0] != null)
+            {
+                for(var i = 0; i< blendModeList.length; i++){
+                    if(blendModeList[i][0] == xmlObject.blending[0].toString()){
+                        ca.blending = blendModeList[i][1] ;
+                        break;
+                    }
+                   
+                }
+            }
+       
+
+           if(xmlObject.opacity[0] != null)
+           ca.opacity = parseFloat( xmlObject.opacity[0]);
+           else ca.opacity = 100.00;
+
+
    actionQueue.push(ca);
+   if(w == null)return;
+   
    createColorPalette(actionGroup, ca);
    w.layout.layout(true);
+
+
 
 }
 
@@ -495,19 +674,55 @@ function OpenXMLDialog(){
       defaultPath = file.path + "/";;
        saveSettings();
    var str = file.read();
-   var xml = new XML(str);
+   SetActionsFromXMLString(str);
+   file.close();
    
-   while(actionGroup.children.length>0) actionGroup.remove(actionGroup.children[0]);  
+
+    }
+
+
+function SetActionsFromXMLString(inputXML){
+
+   
+    var xml = new XML(inputXML);
+
+    if(actionGroup != null) while(actionGroup.children.length>0) actionGroup.remove(actionGroup.children[0]);  
     actionQueue = [];
    
    for(var i =0; i<xml.elements().length(); i++)CreateActionFromXML(xml.elements()[i]);
 
-    w.layout.layout(true);  
+ 
+   saveSettings();
+
+}
+
+
+function CreateXMLString(){
+
+    var xml= new XML("<ColorPreset></ColorPreset>");
+
+    for(var i =0; i<actionQueue.length; i++){ 
+    
+    
+    var blendint = "Unset";
+    for(var q = 0; q< blendModeList.length; q++){
+        if(blendModeList[q][1] == actionQueue[i].blending){
+            blendint = blendModeList[q][0];
+            break;
+        }
+       
+    }
+    
+    
+        xml = xml.appendChild (new XML("<Preset> <name> " + actionQueue[i].name + "</name>" + "<colorHex>" + actionQueue[i].color.rgb.hexValue + "</colorHex>  <applyGlow>" + actionQueue[i].applyGlow+"</applyGlow> <isStroke>" + actionQueue[i].isStroke+"</isStroke> <blending>" + blendint+"</blending><opacity>" + actionQueue[i].opacity+"</opacity> </Preset>" ));
     }
 
+    return xml;
+
+}
+
 function CreateXML(){ 
-var xml= new XML("<ColorPreset></ColorPreset>");
-for(var i =0; i<actionQueue.length; i++)  xml = xml.appendChild (new XML("<Preset> <name> " + actionQueue[i].name + "</name>" + "<colorHex>" + actionQueue[i].color.rgb.hexValue + "</colorHex>  <applyGlow>" + actionQueue[i].applyGlow+"</applyGlow> <isStroke>" + actionQueue[i].isStroke+"</isStroke> </Preset>" ));
+
     
     
     var xmlFile = new File(defaultPath + defaultName);
@@ -516,7 +731,7 @@ for(var i =0; i<actionQueue.length; i++)  xml = xml.appendChild (new XML("<Prese
 if(xmlFile != null){
     xmlFile.open("w");
 
-    xmlFile.writeln(xml);
+    xmlFile.writeln(CreateXMLString());
     xmlFile.close();
     
     defaultPath = xmlFile.path + "/";
@@ -529,7 +744,8 @@ if(xmlFile != null){
 function saveSettings()
 {
   var desc = new ActionDescriptor();
-	desc.putString(kMyString, defaultPath);
+  desc.putString(kMyString, defaultPath);
+  desc.putString(xmlString, CreateXMLString());
   // "true" means setting persists across Photoshop launches.
   app.putCustomOptions( kMySettings, desc, true );
 }
@@ -539,6 +755,8 @@ function getSettings()
     try{
   var desc = app.getCustomOptions( kMySettings );
   defaultPath = desc.getString(kMyString);
+  lastUsed = desc.getString(xmlString); 
+
   }
 catch(e){
 

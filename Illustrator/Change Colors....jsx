@@ -153,9 +153,12 @@ function main() {
 w.onShow = function(){    for(var i =0; i<presetNames.length; i++){
         createAction(actionPanel,presetNames[i],presetTypes[i], app.activeDocument.defaultFillColor)    ;    
           w.layout.layout(true);
+          w.center();
         }}; 
 
     w.show();
+
+
 
 
 

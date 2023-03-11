@@ -20,12 +20,10 @@ var appliedComp = theSOMore.getInteger(stringIDToTypeID("comp"));
 if (theCompsList.count > 2) {
 var theCompsList = theCompsList.getList(stringIDToTypeID("compList"));
 
+	setLayerCompByID(0);
+	app.activeDocument.activeLayer.name += " (Last Active)";
 
-	var id = theCompsList.getObjectValue(0).getInteger(stringIDToTypeID("ID"));
-	setLayerCompByID(id);
-	app.activeDocument.activeLayer.name = combNames[0];
-
-for (var m = 1; m < theCompsList.count; m++) {
+for (var m = 0; m < theCompsList.count; m++) {
 	
 	var id = theCompsList.getObjectValue(m).getInteger(stringIDToTypeID("ID"));
 	var name = theCompsList.getObjectValue(m).getString(stringIDToTypeID("name"));
