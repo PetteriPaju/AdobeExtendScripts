@@ -16,7 +16,7 @@ Allows you to change the color of any type of layer, with a single command. Supp
 
 Smart fill also supports multi selection, so you can modify multiple layers at one. 
 
-Bind RunSmartFill.jsx to hotkey to use.
+Bind RunSmartFill.jsx to a hotkey to easy use.
 
 ### Color Changer
 ![58tigyj70u](https://user-images.githubusercontent.com/4920156/224509732-a7b8c1f9-d550-448e-8f6d-e8ef688e387c.png)
