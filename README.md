@@ -1,5 +1,5 @@
 # Adobe Extendscripts
-This page contains collection of extensions made for Adobe Illustrator and Phoshop.
+This page contains collection of extensions made for Adobe Illustrator and Photoshop.
 Extensions are made using Javascript and Adobe's Extendscript-API.
 
 Disclaimer! All these scripts were made for my personal use and are here for presentation purposes. They are not actively developed and not made for public use. 
